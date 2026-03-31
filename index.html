@@ -43,6 +43,9 @@
     .comment { font-size: 14px; color: #555; }
     .delete-btn { background: red; margin-top: 5px; padding: 5px; font-size: 12px }
     .rolling { font-size: 20px; margin-top: 20px; }
+    #saveBtn {
+      transition: 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -55,6 +58,10 @@
   <div id="participants"></div>
   <div class="rolling" id="rolling"></div>
   <div id="winnerList"></div>
+
+  <button id="saveBtn" onclick="saveToSheet()" style="display:none;">
+    Save to Spreadsheet
+  </button>
 </div>
 
 <script>
@@ -133,7 +140,10 @@ function startRolling() {
 function pickWinner(user) {
   winners.push(user);
 
-  if (winners.length >= 3) pickBtn.disabled = true;
+  if (winners.length >= 3) {
+    pickBtn.disabled = true;
+    saveBtn.style.display = 'block'; // 👈 munculin button
+  }
 
   render();
 }
@@ -142,6 +152,11 @@ function pickWinner(user) {
 function deleteWinner(i) {
   winners.splice(i,1);
   pickBtn.disabled = false;
+
+  if (winners.length < 3) {
+    saveBtn.style.display = 'none'; // 👈 sembunyiin lagi
+  }
+
   render();
 }
 
@@ -155,6 +170,31 @@ function render() {
       <div class="comment">💬 ${w.comment}</div>
       <button class="delete-btn" onclick="deleteWinner(${i})">Hapus</button>
     `;
+  });
+}
+
+//SAVE
+function saveToSheet() {
+  if (winners.length === 0) {
+    alert('Belum ada winner bro 😅');
+    return;
+  }
+
+  fetch('https://script.google.com/macros/s/AKfycby0S9zodY4ydVPvW5zQTccIrC0GAjhUfyP5dbZ6F2xa_E140ST0nQiJ1jcrpj9qkvON/exec', {
+    method: 'POST',
+    body: JSON.stringify(winners),
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  })
+  .then(res => res.text()) // ⬅️ bukan json dulu
+  .then(res => {
+    console.log(res);
+    alert('Berhasil disimpan ke Google Sheets ✅');
+  })
+  .catch(err => {
+    console.error(err);
+    alert('Error bro 😭');
   });
 }
 </script>
