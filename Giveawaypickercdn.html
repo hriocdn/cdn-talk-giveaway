@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CDN Talk Giveaway Picker</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      margin: 0;
+      background: linear-gradient(to right, rgba(0,95,208,0.68), #002CC1);
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 14px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    h1 { margin-bottom: 10px; }
+    button, input {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+    }
+    button {
+      background: #002CC1;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { background: gray; }
+    .winner { margin-top: 15px; font-weight: bold; }
+    .comment { font-size: 14px; color: #555; }
+    .delete-btn { background: red; margin-top: 5px; padding: 5px; font-size: 12px }
+    .rolling { font-size: 20px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎉 CDN Talk Giveaway Picker</h1>
+
+  <input type="file" id="fileInput" />
+  <button id="pickBtn" onclick="startRolling()">Pick Winner</button>
+
+  <div id="participants"></div>
+  <div class="rolling" id="rolling"></div>
+  <div id="winnerList"></div>
+</div>
+
+<script>
+let users = [];
+let winners = [];
+
+// LOAD FILE
+fileInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith('.csv')) {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: res => processData(res.data)
+    });
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      processData(json);
+    };
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+// PROCESS DATA
+function processData(data) {
+  let mapped = data.map(row => {
+    const n = {};
+    Object.keys(row).forEach(k => n[k.toLowerCase()] = row[k]);
+
+    return {
+      username: n.username || n.ownerusername,
+      comment: n.comment || n.text || ''
+    };
+  });
+
+  // FILTER: must tag 3 accounts
+  mapped = mapped.filter(u => (u.comment.match(/@/g) || []).length >= 3);
+
+  // REMOVE DUPLICATE
+  const map = new Map();
+  mapped.forEach(u => {
+    if (!map.has(u.username)) map.set(u.username, u);
+  });
+
+  users = Array.from(map.values());
+
+  participants.innerHTML = `Participants: ${users.length}`;
+}
+
+// ROLLING ANIMATION
+function startRolling() {
+  if (users.length === 0) return alert('Upload dulu');
+  if (winners.length >= 3) return;
+
+  let count = 0;
+  const roll = setInterval(() => {
+    const rand = users[Math.floor(Math.random() * users.length)];
+    rolling.innerHTML = `@${rand.username}`;
+    count++;
+
+    if (count > 20) {
+      clearInterval(roll);
+      pickWinner(rand);
+    }
+  }, 100);
+}
+
+// FINAL PICK
+function pickWinner(user) {
+  winners.push(user);
+
+  if (winners.length >= 3) pickBtn.disabled = true;
+
+  render();
+}
+
+// DELETE
+function deleteWinner(i) {
+  winners.splice(i,1);
+  pickBtn.disabled = false;
+  render();
+}
+
+// RENDER
+function render() {
+  winnerList.innerHTML = '<h3>🏆 Winners</h3>';
+
+  winners.forEach((w,i)=>{
+    winnerList.innerHTML += `
+      <div class="winner">${i+1}. @${w.username}</div>
+      <div class="comment">💬 ${w.comment}</div>
+      <button class="delete-btn" onclick="deleteWinner(${i})">Hapus</button>
+    `;
+  });
+}
+</script>
+</body>
+</html>
